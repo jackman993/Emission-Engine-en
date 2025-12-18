@@ -6,10 +6,16 @@ import streamlit as st
 import sys
 from pathlib import Path
 
-# Add parent directory to path
+# Add parent directory to path (now Calculator.py is in pages/, so parent.parent gets root)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from emission_calc import Inputs, estimate, GRID_EMISSION_FACTORS
+
+st.set_page_config(
+    page_title="Calculator",
+    page_icon="🌍",
+    layout="wide"
+)
 
 st.title("🌍 Carbon Emission Calculator")
 
