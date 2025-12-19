@@ -9,7 +9,7 @@ from pathlib import Path
 # Add parent directory to path (now Calculator.py is in pages/, so parent.parent gets root)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from emission_calc import Inputs, estimate, GRID_EMISSION_FACTORS
+from emission_calc import Inputs, estimate, GRID_EMISSION_FACTORS, REGION_ELECTRICITY_PRICES
 
 st.set_page_config(
     page_title="Calculator",
@@ -36,11 +36,23 @@ region = st.selectbox(
     "Select Your Region",
     options=list(region_names.keys()),
     format_func=lambda x: region_names[x],
-    help="Different regions have different grid emission factors"
+    help="Different regions have different grid emission factors",
+    key="calc_region_selector"
 )
 
 grid_ef = GRID_EMISSION_FACTORS[region]
 st.info(f"Grid Emission Factor: **{grid_ef} kg CO2/kWh**")
+
+# Store current region in session state to detect changes
+if "calc_last_region" not in st.session_state:
+    st.session_state.calc_last_region = region
+
+# Reset price when region changes to match new region's default
+if st.session_state.calc_last_region != region:
+    st.session_state.calc_last_region = region
+    # Reset price to new region's default when region changes
+    new_region_config = REGION_ELECTRICITY_PRICES.get(region, REGION_ELECTRICITY_PRICES["TW"])
+    st.session_state.calc_price_kwh = float(new_region_config["price"])
 
 st.divider()
 
@@ -52,28 +64,66 @@ tab1, tab2 = st.tabs(["Quick Mode", "Detailed Mode"])
 with tab1:
     st.write("**Quick Estimation (Monthly Bill)**")
     
+    # Check if clear was requested
+    if st.session_state.get("clear_calc_inputs", False):
+        keys_to_clear = [
+            "calc_monthly_bill",
+            "calc_price_kwh",
+            "calc_cars",
+            "calc_motorcycles",
+            "result",
+            "calculation_done"
+        ]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state.clear_calc_inputs = False
+    
+    # Get region-specific currency and price
+    region_config = REGION_ELECTRICITY_PRICES.get(region, REGION_ELECTRICITY_PRICES["TW"])
+    currency_symbol = region_config["symbol"]
+    default_price = region_config["price"]
+    
+    # Monthly bill input with region-specific currency
     monthly_bill = st.number_input(
-        "Monthly Electricity Bill (USD/NTD/EUR)",
+        f"Monthly Electricity Bill ({currency_symbol})",
         min_value=0,
         value=5000,
-        step=500
+        step=500,
+        key="calc_monthly_bill"
     )
     
+    # Price per kWh with region-specific currency and default value
+    # Get current price value or use default (ensure float type)
+    if "calc_price_kwh" in st.session_state:
+        current_price = float(st.session_state.calc_price_kwh)
+    else:
+        current_price = float(default_price)
+    
     price_per_kwh = st.number_input(
-        "Electricity Price per kWh",
+        f"Electricity Price per kWh ({currency_symbol}/kWh)",
         min_value=0.0,
-        value=0.12,
-        step=0.01,
-        help="Typical: US $0.12, TW NT$4.4, EU €0.25"
+        value=current_price,
+        step=0.01 if default_price < 1 else (1.0 if default_price < 10 else 5.0),
+        help=f"Default: {region_config['note']}. Adjust based on your actual electricity rate.",
+        key="calc_price_kwh"
     )
+    
+    # Info box explaining this is an estimate
+    st.info(f"💡 **Note**: Default electricity price is **{currency_symbol}{default_price}/kWh** ({region_config['note']}). This is an estimate and may vary by industry and consumption level. Please adjust based on your actual rate.")
+    
+    # Clear all button
+    if st.button("🔄 Clear All Inputs", key="clear_all_calc_inputs", use_container_width=True):
+        st.session_state.clear_calc_inputs = True
+        st.rerun()
     
     col1, col2 = st.columns(2)
     
     with col1:
-        cars = st.number_input("Number of Cars", min_value=0, value=5)
+        cars = st.number_input("Number of Cars", min_value=0, value=5, key="calc_cars")
     
     with col2:
-        motorcycles = st.number_input("Number of Motorcycles", min_value=0, value=10)
+        motorcycles = st.number_input("Number of Motorcycles", min_value=0, value=10, key="calc_motorcycles")
     
     if st.button("Calculate (Quick)", type="primary", use_container_width=True):
         inputs = Inputs(
