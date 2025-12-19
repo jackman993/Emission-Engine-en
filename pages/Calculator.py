@@ -9,7 +9,20 @@ from pathlib import Path
 # Add parent directory to path (now Calculator.py is in pages/, so parent.parent gets root)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from emission_calc import Inputs, estimate, GRID_EMISSION_FACTORS, REGION_ELECTRICITY_PRICES
+from emission_calc import Inputs, estimate, GRID_EMISSION_FACTORS
+
+# Import REGION_ELECTRICITY_PRICES with fallback
+try:
+    from emission_calc import REGION_ELECTRICITY_PRICES
+except ImportError:
+    # Fallback: define it here if not available
+    REGION_ELECTRICITY_PRICES = {
+        "TW": {"price": 4.4, "currency": "NTD", "symbol": "NT$", "note": "Taiwan average commercial electricity rate"},
+        "US": {"price": 0.12, "currency": "USD", "symbol": "$", "note": "US average commercial electricity rate"},
+        "EU": {"price": 0.25, "currency": "EUR", "symbol": "€", "note": "EU average commercial electricity rate"},
+        "CN": {"price": 0.8, "currency": "CNY", "symbol": "¥", "note": "China average commercial electricity rate"},
+        "JP": {"price": 25, "currency": "JPY", "symbol": "¥", "note": "Japan average commercial electricity rate"}
+    }
 
 st.set_page_config(
     page_title="Calculator",
